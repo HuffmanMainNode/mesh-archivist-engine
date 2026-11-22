@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+*.jsonl
+PUBLIC_SHOWCASE_LEDGER.jsonl
+PUBLIC_LEDGER_MERKLE.txt
+ARCHIVAL_CATALOG.jsonl
+next_repo_proposals.json
+tests/.tmp/
