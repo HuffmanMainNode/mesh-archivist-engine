@@ -11,7 +11,7 @@ This is local repository tooling, not a hosted service or an always-running acco
 
 ## Requirements
 
-Python 3.11 or newer. No third-party Python packages. Journal concurrency uses POSIX `flock`. GitHub API access uses `urllib.request` and an optional caller-supplied `GITHUB_TOKEN`. Never place tokens in TOML, command history, task envelopes, or catalogs.
+Python 3.11 or newer. No third-party runtime packages. The project includes packaging metadata and can be installed with `python -m pip install .`; setuptools is used only at build time. Journal concurrency uses POSIX `flock`. GitHub API access uses `urllib.request` and an optional caller-supplied `GITHUB_TOKEN`. Never place tokens in TOML, command history, task envelopes, or catalogs.
 
 ## CLI
 
