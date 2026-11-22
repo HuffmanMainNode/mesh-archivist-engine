@@ -50,7 +50,8 @@ jobs:
           sensitive = re.compile(
               r"(gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
               r"-----BEGIN (?:OPENSSH|RSA|EC|PRIVATE) KEY-----|"
-              r"(?i:access[_-]?token|api[_-]?key|password|client[_-]?secret)\s*[:=]"
+              r"(?:access[_-]?token|api[_-]?key|password|client[_-]?secret)\\s*[:=])",
+              re.IGNORECASE,
           )
           if sensitive.search(raw):
               raise SystemExit("Credential-like material detected in namespaces.toml")
