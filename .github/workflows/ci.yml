@@ -1,0 +1,59 @@
+name: Mesh Archivist CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify node and summon contract
+        run: make verify
+      - name: Run unit tests
+        run: make test
+      - name: Enforce placeholder-only namespace configuration
+        run: |
+          python3 - <<'PY'
+          import re
+          import tomllib
+          from pathlib import Path
+
+          path = Path("namespaces.toml")
+          raw = path.read_text(encoding="utf-8")
+          config = tomllib.loads(raw)
+          allowed = {"primary-core-account", "standards-spec-account"}
+          entries = config.get("namespaces")
+          if not isinstance(entries, list) or not entries:
+              raise SystemExit("namespaces.toml must contain placeholder namespace entries")
+
+          handles = []
+          for entry in entries:
+              handle = entry.get("handle")
+              if not isinstance(handle, str) or handle not in allowed:
+                  raise SystemExit(f"Non-placeholder namespace handle rejected: {handle!r}")
+              handles.append(handle)
+
+          if len(handles) != len(set(handles)):
+              raise SystemExit("Duplicate placeholder handles are not permitted")
+
+          sensitive = re.compile(
+              r"(gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
+              r"-----BEGIN (?:OPENSSH|RSA|EC|PRIVATE) KEY-----|"
+              r"(?i:access[_-]?token|api[_-]?key|password|client[_-]?secret)\s*[:=]"
+          )
+          if sensitive.search(raw):
+              raise SystemExit("Credential-like material detected in namespaces.toml")
+
+          print(f"Namespace guard passed: {len(handles)} approved placeholder handles.")
+          PY
