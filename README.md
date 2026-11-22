@@ -1,6 +1,6 @@
 # Mesh Archivist Engine
 
-Version: 1.0.1 development line  
+Version: 1.0.1  
 Runtime: Python 3.11+ standard library; POSIX file locking for journal safety
 
 ## Scope

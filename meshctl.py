@@ -235,7 +235,7 @@ def main(argv=None):
     p = sub.add_parser("resume"); p.add_argument("path"); p.set_defaults(func=do_resume)
     p = sub.add_parser("summon"); p.add_argument("path"); p.add_argument("--execute", action="store_true", help="execute reviewed commands; default is dry-run")
     p.add_argument("--timeout", type=float, default=60.0); p.set_defaults(func=do_summon)
-    p = sub.add_parser("verify"); p.add_argument("path"); p.set_defaults(func=lambda a: (print(json.dumps(verify(a.path), sort_keys=True)) or 0))
+    p = sub.add_parser("verify"); p.add_argument("path", nargs="?", default="."); p.set_defaults(func=lambda a: (print(json.dumps(verify(a.path), sort_keys=True)) or 0))
     args = parser.parse_args(argv)
     try:
         return args.func(args)
