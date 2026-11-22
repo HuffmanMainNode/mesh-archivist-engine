@@ -16,13 +16,13 @@ PLANES = {"contract-plane", "ingress-plane", "compute-plane", "provenance-plane"
 PLACEHOLDERS = {"primary-core-account", "standards-spec-account"}
 
 
-def get_json(url, token):
+def get_json(url, token, timeout=30.0):
     headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
                "User-Agent": "mesh-archivist-engine/1"}
     if token:
         headers["Authorization"] = "Bearer " + token
     request = Request(url, headers=headers)
-    with urlopen(request, timeout=30) as response:
+    with urlopen(request, timeout=timeout) as response:
         return json.loads(response.read().decode("utf-8")), response.headers
 
 
@@ -66,8 +66,8 @@ def main():
         endpoint = "orgs" if namespace.get("kind", "user") == "org" else "users"
         page = 1
         while True:
-            url = f"{args.api}/{endpoint}/{handle}/repos?per_page=100&page={page}&type=owner&sort=full_name&direction=asc"
-            data, _headers = get_json(url, token)
+            url = f"{args.api}/{endpoint}/{handle}/repos?per_page=100&page={page}&type=public&sort=full_name&direction=asc"
+            data, _headers = get_json(url, token, args.timeout)
             if not isinstance(data, list):
                 raise ValueError("GitHub repository listing response was not an array")
             if not data:
@@ -87,7 +87,7 @@ def main():
                     continue
                 clone_count = None
                 try:
-                    traffic, _ = get_json(f"{args.api}/repos/{full_name}/traffic/clones", token)
+                    traffic, _ = get_json(f"{args.api}/repos/{full_name}/traffic/clones", token, args.timeout)
                     clone_count = traffic.get("count") if isinstance(traffic, dict) else None
                 except (HTTPError, URLError, TimeoutError):
                     clone_count = None
