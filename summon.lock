@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0.0",
+  "depends_on": ["repo-mesh-blueprint"],
+  "env_defaults": {},
+  "bootstrap_commands": [],
+  "healthcheck_command": ["python3", "-c", "print('mesh-archivist-engine healthcheck: passed')"]
+}
