@@ -38,8 +38,14 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade build
           python -m build
+          VERSION="$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")"
+          test "v$VERSION" = "v1.0.1"
           python -m pip install --no-deps dist/*.whl
           python -c "import mesh_agent, mesh_runtime; print(mesh_agent.PROTOCOL)"
+          meshctl --help
+          mesh-crawl-namespaces --help
+          mesh-gap-plan --help
+          mesh-diode-promote --help
           python -m unittest discover -s tests -v
           (cd dist && sha256sum * > SHA256SUMS)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
