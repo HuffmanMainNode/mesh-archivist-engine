@@ -9,5 +9,5 @@
   "plane": "tooling-plane",
   "parent": "repo-mesh-blueprint",
   "depends_on": ["repo-mesh-blueprint"],
-  "description": "Standard-library-only mesh archival, verification, and node lifecycle tooling."
+  "description": "Standard-library-first mesh archival, verification, and node lifecycle tooling."
 }
