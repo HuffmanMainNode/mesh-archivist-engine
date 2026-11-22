@@ -21,6 +21,12 @@ classifiers = [
 ]
 dependencies = []
 
+[project.scripts]
+meshctl = "meshctl:main"
+mesh-crawl-namespaces = "crawl_namespaces:main"
+mesh-gap-plan = "gap_planner:main"
+mesh-diode-promote = "diode_promote:main"
+
 [tool.setuptools]
 packages = ["mesh_agent"]
 py-modules = ["mesh_runtime", "meshctl", "crawl_namespaces", "diode_promote", "gap_planner"]
