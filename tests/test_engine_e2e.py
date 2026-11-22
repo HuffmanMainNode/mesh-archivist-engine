@@ -38,6 +38,7 @@ class EngineE2E(unittest.TestCase):
     def test_dag_sort_and_cycle_detection(self):
         node=self.tmp/"dag"; run(MESH,"init",node,"--node-id","root","--namespace","ns","--visibility","public","--tier","2","--plane","compute-plane")
         meta=json.loads((node/".mesh-node.json").read_text()); meta["depends_on"]=["a","b","c"]; (node/".mesh-node.json").write_text(json.dumps(meta))
+        summon=json.loads((node/"summon.lock").read_text()); summon["depends_on"]=["a","b","c"]; (node/"summon.lock").write_text(json.dumps(summon))
         lock={"schema_version":"1.0.0","satellites":[{"node_id":"c","depends_on":["b"],"uri":"https://example.invalid/repo","version":"1.0.0","commit":"0123456789abcdef0123456789abcdef01234567"},{"node_id":"b","depends_on":["a"],"uri":"https://example.invalid/repo","version":"1.0.0","commit":"0123456789abcdef0123456789abcdef01234567"},{"node_id":"a","depends_on":[],"uri":"https://example.invalid/repo","version":"1.0.0","commit":"0123456789abcdef0123456789abcdef01234567"}]}
         (node/"mesh.lock").write_text(json.dumps(lock)); result=run(MESH,"verify",node); self.assertEqual(result.returncode,0,result.stderr); self.assertLess(result.stdout.index('"a"'),result.stdout.index('"b"'))
         lock["satellites"][0]["depends_on"]=["b"]; lock["satellites"][1]["depends_on"]=["c"]; (node/"mesh.lock").write_text(json.dumps(lock))
