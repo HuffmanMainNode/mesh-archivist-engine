@@ -48,8 +48,14 @@ def topological_sort(lock):
         node_id = item["node_id"]
         if node_id in graph:
             raise ValueError(f"duplicate dependency node_id: {node_id}")
-        if not item.get("uri") or not item.get("version"):
-            raise ValueError(f"dependency {node_id} must pin uri and version")
+        if not isinstance(item.get("uri"), str) or not item["uri"].startswith("https://"):
+            raise ValueError(f"dependency {node_id} must use an HTTPS repository URI")
+        if not isinstance(item.get("version"), str) or not item["version"].strip():
+            raise ValueError(f"dependency {node_id} must declare a release identifier")
+        if not isinstance(item.get("commit"), str) or not HEX40.fullmatch(item["commit"]):
+            raise ValueError(f"dependency {node_id} must pin a full 40-character commit SHA")
+        if not isinstance(item.get("depends_on", []), list) or any(not isinstance(dep, str) or not dep for dep in item.get("depends_on", [])):
+            raise ValueError(f"dependency {node_id} has invalid depends_on")
         graph[node_id] = item.get("depends_on", [])
     state, ordered = {}, []
 
@@ -107,6 +113,20 @@ def verify(root):
         order, graph = topological_sort(lock)
         if set(dependencies) != set(graph):
             raise ValueError("mesh-node depends_on does not match pinned mesh.lock dependencies")
+    summon_path = root / "summon.lock"
+    if not summon_path.is_file():
+        raise ValueError("missing summon.lock")
+    summon = json.loads(summon_path.read_text(encoding="utf-8"))
+    if _major(summon.get("schema_version")) != 1:
+        raise ValueError("unsupported summon.lock schema major version")
+    if summon.get("depends_on", []) != dependencies:
+        raise ValueError("summon.lock depends_on does not match .mesh-node.json")
+    if not isinstance(summon.get("env_defaults", {}), dict):
+        raise ValueError("summon.lock env_defaults must be an object")
+    if not isinstance(summon.get("bootstrap_commands", []), list):
+        raise ValueError("summon.lock bootstrap_commands must be an array")
+    if not isinstance(summon.get("healthcheck_command"), list) or not summon["healthcheck_command"]:
+        raise ValueError("summon.lock requires a non-empty healthcheck_command")
     journal = read_journal(wal_path(root))
     return {"node_id": meta["node_id"], "tier": meta["tier"], "dependency_order": order, "wal_entries": len(journal)}
 
