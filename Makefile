@@ -2,7 +2,8 @@ PYTHON ?= python3
 
 .PHONY: verify test clean
 verify:
-	$(PYTHON) meshctl.py verify ../repo-mesh-blueprint/templates/tier1-solo
+	$(PYTHON) meshctl.py verify .
+	$(PYTHON) meshctl.py summon .
 	test -f meshctl.py -a -f crawl_namespaces.py -a -f gap_planner.py -a -f diode_promote.py
 
 test:
