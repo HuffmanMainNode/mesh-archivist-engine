@@ -2,7 +2,7 @@ name: Mesh Archivist CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "hardening/**"]
   pull_request:
     branches: [main]
 
@@ -12,49 +12,43 @@ permissions:
 jobs:
   verify-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
       - name: Verify node and summon contract
         run: make verify
-      - name: Run unit tests
+      - name: Run unit and security tests
         run: make test
       - name: Enforce placeholder-only namespace configuration
+        if: matrix.python-version == '3.11'
         run: |
           python3 - <<'PY'
           import re
           import tomllib
           from pathlib import Path
 
-          path = Path("namespaces.toml")
-          raw = path.read_text(encoding="utf-8")
+          raw = Path("namespaces.toml").read_text(encoding="utf-8")
           config = tomllib.loads(raw)
           allowed = {"primary-core-account", "standards-spec-account"}
           entries = config.get("namespaces")
           if not isinstance(entries, list) or not entries:
-              raise SystemExit("namespaces.toml must contain placeholder namespace entries")
-
-          handles = []
-          for entry in entries:
-              handle = entry.get("handle")
-              if not isinstance(handle, str) or handle not in allowed:
-                  raise SystemExit(f"Non-placeholder namespace handle rejected: {handle!r}")
-              handles.append(handle)
-
-          if len(handles) != len(set(handles)):
-              raise SystemExit("Duplicate placeholder handles are not permitted")
-
+              raise SystemExit("namespace configuration must remain placeholder-only in CI")
+          handles = [entry.get("handle") for entry in entries]
+          if any(handle not in allowed for handle in handles) or len(handles) != len(set(handles)):
+              raise SystemExit("only unique approved placeholders are allowed in the committed config")
           sensitive = re.compile(
               r"(gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
               r"-----BEGIN (?:OPENSSH|RSA|EC|PRIVATE) KEY-----|"
-              r"(?:access[_-]?token|api[_-]?key|password|client[_-]?secret)\\s*[:=])",
+              r"(?:access[_-]?token|api[_-]?key|password|client[_-]?secret)\s*[:=])",
               re.IGNORECASE,
           )
           if sensitive.search(raw):
-              raise SystemExit("Credential-like material detected in namespaces.toml")
-
-          print(f"Namespace guard passed: {len(handles)} approved placeholder handles.")
+              raise SystemExit("credential-like material detected in namespace configuration")
+          print("Namespace and credential guard passed.")
           PY

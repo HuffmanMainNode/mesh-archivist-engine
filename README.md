@@ -1,56 +1,45 @@
 # Mesh Archivist Engine
 
-Version: 1.0.1 development line  
-Runtime: Python 3.11+ standard library; POSIX file locking for journal safety
+Version: 1.0.0  
+Runtime: Python 3.11+ standard library and POSIX shell for Make targets
 
 ## Scope
 
-`meshctl.py` initializes, checkpoints, resumes, summons, and verifies individual mesh nodes. `crawl_namespaces.py` performs an explicitly invoked public-only GitHub inventory scan. `gap_planner.py` identifies plane coverage gaps. `diode_promote.py` creates a deny-by-default public projection from a reviewed catalog.
+`meshctl.py` initializes, checkpoints, resumes, summons, and verifies individual mesh nodes. `crawl_namespaces.py` performs an explicitly invoked GitHub inventory scan. `gap_planner.py` identifies plane coverage gaps. `diode_promote.py` creates a deny-by-default public projection from a private catalog.
 
-This is local repository tooling, not a hosted service or an always-running account scanner. Namespace configuration ships with placeholders and performs no network access until an operator replaces them.
+The engine does not run as a hosted service and does not scan accounts automatically. The namespace file ships with generic placeholders. Replace them only after reviewing scope and credentials.
 
 ## Requirements
 
-Python 3.11 or newer. No third-party Python packages. Journal concurrency uses POSIX `flock`. GitHub API access uses `urllib.request` and an optional caller-supplied `GITHUB_TOKEN`. Never place tokens in TOML, command history, task envelopes, or catalogs.
+Python 3.11 or newer. No third-party Python packages. GitHub API access uses `urllib.request` and a user-supplied token from `GITHUB_TOKEN`; never place tokens in TOML, command history, or catalogs.
 
 ## CLI
 
 ```sh
-python3 meshctl.py init ./node --node-id example --namespace example --visibility private --tier 1 --plane tooling-plane
+python3 meshctl.py init ./node --node-id example --namespace example --visibility private --tier 1 --plane tooling-plane --parent ''
 python3 meshctl.py checkpoint ./node --step bootstrap --status PENDING
 python3 meshctl.py resume ./node
 python3 meshctl.py verify ./node
-python3 meshctl.py summon ./node                 # dry-run only
-python3 meshctl.py summon ./node --execute       # explicit execution after reviewing summon.lock
+python3 meshctl.py summon ./node
 ```
 
-Summon is dry-run by default. Execution uses argv arrays without a shell, applies a timeout to each command, and records pending/committed/failed lifecycle entries in the WAL. Review every command before using `--execute`.
+`checkpoint` supports `PENDING`, `COMMITTED`, and `FAILED`. Each entry is canonical JSON, SHA-256 chained, appended with flush and `fsync`. `resume` validates the entire log before reporting the last committed checkpoint and unresolved pending steps.
 
-## WAL and recovery
+`summon` executes the commands in `summon.lock`. Review the file before running it. Existing environment variables take precedence over `env_defaults`.
 
-The JSONL journal is SHA-256 hash-chained, serialized under an advisory file lock, appended with one write, flushed, and fsynced. A malformed unterminated final fragment is treated as an interrupted append and truncated to the last complete record. A malformed complete line, sequence gap, predecessor mismatch, or digest mismatch is rejected. A complete final JSON object without a newline is retained and normalized with a delimiter.
-
-`resume` validates the journal and reports unresolved work. It is deliberately plan-only: arbitrary commands are never replayed automatically. An operator or higher-level orchestrator must inspect the pending operation and decide whether retry is safe.
-
-## Dependency contract
-
-The root `.mesh-node.json` declares `repo-mesh-blueprint`; `mesh.lock` pins its URI, release identifier, and commit SHA. `verify` rejects unsupported major versions, mismatched declarations, missing graph nodes, duplicate IDs, and dependency cycles. A commit pin is an identity declaration; consumers must independently retrieve and verify that commit before trusting remote content.
-
-## Public namespace inventory
+## Namespace inventory
 
 ```sh
 python3 crawl_namespaces.py --config namespaces.toml --output ARCHIVAL_CATALOG.jsonl
 python3 gap_planner.py --catalog ARCHIVAL_CATALOG.jsonl --output next_repo_proposals.json
-python3 diode_promote.py --input ARCHIVAL_CATALOG.jsonl --output PUBLIC_SHOWCASE_LEDGER.jsonl --root-output PUBLIC_LEDGER_MERKLE.txt --approve-review
+python3 diode_promote.py --input ARCHIVAL_CATALOG.jsonl --output PUBLIC_SHOWCASE_LEDGER.jsonl --root-output PUBLIC_LEDGER_MERKLE.txt
 ```
 
-The crawler accepts only explicitly configured public user/organization namespaces. It discards private or non-public repository entries before reading repository metadata, requesting traffic, or writing catalog records. A catalog write that completes before a WAL append is reconciled on the next run. GitHub traffic data is optional and depends on the token's permissions and GitHub's availability window.
+The crawler is opt-in and reads only the namespace handles explicitly listed in TOML. It records completed repositories in `.crawler-wal.jsonl`, reconciles a catalog write interrupted before its WAL completion record, and collects repository metadata plus clone traffic where the token has access. GitHub clone traffic is subject to GitHub's availability window and permission model. Declare plane coverage with exact GitHub topics such as `mesh-plane:contract-plane`; the planner does not guess architectural coverage from repository prose.
 
-The diode exports only a fixed allowlist, requires public visibility, excludes private records, and requires an explicit human review confirmation. Its Merkle root proves deterministic integrity of the exported record set; it does not provide confidentiality, authenticity, or authorization.
+## Dual projection
 
-## Agent integration
-
-See `AGENT_HANDSHAKE.md`. The adapter rejects scope escapes and requires a host-provided cryptographic approval verifier for every side-effecting operation (`checkpoint`, `summon`, `crawl`, `promote`, and `mutate`). The adapter does not implement a signature scheme or execute operations itself.
+Keep the Private Workshop Inventory in a protected location. The diode emits only a fixed public field allowlist, excludes records with `private: true`, and reports the redacted count. Review the output before publishing. Merkle integrity is not an access-control mechanism.
 
 ## Verification
 
@@ -59,6 +48,12 @@ make verify
 make test
 make clean
 ```
+
+`make clean` removes only local Python bytecode caches and test scratch files under `tests/.tmp`; it does not delete catalogs, WALs, node state, or source files.
+
+## Agent integration
+
+See `AGENT_HANDSHAKE.md`. Agent-facing consumers should validate task envelopes, declare capabilities, preserve scope ceilings, emit deterministic JSON, and return evidence references. The CLI is intentionally importable by standard-library-only adapters. The `mesh_agent` package supplies envelope validation, capability declarations, and deterministic result envelopes for agent runtimes.
 
 ## License
 
