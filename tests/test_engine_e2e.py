@@ -37,7 +37,9 @@ class EngineE2E(unittest.TestCase):
             e=json.loads(line); h=e.pop("entry_hash"); self.assertEqual(e["prev_hash"],prev); self.assertEqual(hashlib.sha256(canonical(e).encode()).hexdigest(),h); prev=h
     def test_dag_sort_and_cycle_detection(self):
         node=self.tmp/"dag"; run(MESH,"init",node,"--node-id","root","--namespace","ns","--visibility","public","--tier","2","--plane","compute-plane")
-        lock={"schema_version":"1.0.0","satellites":[{"node_id":"c","depends_on":["b"],"uri":"x","version":"1"},{"node_id":"b","depends_on":["a"],"uri":"x","version":"1"},{"node_id":"a","depends_on":[],"uri":"x","version":"1"}]}
+        meta=json.loads((node/".mesh-node.json").read_text()); meta["depends_on"]=["a","b","c"]; (node/".mesh-node.json").write_text(json.dumps(meta))
+        summon=json.loads((node/"summon.lock").read_text()); summon["depends_on"]=["a","b","c"]; (node/"summon.lock").write_text(json.dumps(summon))
+        lock={"schema_version":"1.0.0","satellites":[{"node_id":"c","depends_on":["b"],"uri":"https://example.invalid/repo","version":"1.0.0","commit":"0123456789abcdef0123456789abcdef01234567"},{"node_id":"b","depends_on":["a"],"uri":"https://example.invalid/repo","version":"1.0.0","commit":"0123456789abcdef0123456789abcdef01234567"},{"node_id":"a","depends_on":[],"uri":"https://example.invalid/repo","version":"1.0.0","commit":"0123456789abcdef0123456789abcdef01234567"}]}
         (node/"mesh.lock").write_text(json.dumps(lock)); result=run(MESH,"verify",node); self.assertEqual(result.returncode,0,result.stderr); self.assertLess(result.stdout.index('"a"'),result.stdout.index('"b"'))
         lock["satellites"][0]["depends_on"]=["b"]; lock["satellites"][1]["depends_on"]=["c"]; (node/"mesh.lock").write_text(json.dumps(lock))
         result=run(MESH,"verify",node); self.assertNotEqual(result.returncode,0); self.assertIn("cycle",result.stderr)
@@ -46,7 +48,7 @@ class EngineE2E(unittest.TestCase):
     def test_summon_bootstrap_and_healthcheck(self):
         node=self.tmp/"summon"; run(MESH,"init",node,"--node-id","n","--namespace","ns","--visibility","private","--tier","1","--plane","tooling-plane")
         marker=node/"bootstrapped.txt"; lock={"schema_version":"1.0.0","env_defaults":{"MESH_TEST_DEFAULT":"set"},"bootstrap_commands":[[sys.executable,"-c",f"from pathlib import Path; Path({str(marker)!r}).write_text('ok')"]],"healthcheck_command":[sys.executable,"-c","import os; assert os.environ['MESH_TEST_DEFAULT']=='set'"]}
-        (node/"summon.lock").write_text(json.dumps(lock)); result=run(MESH,"summon",node); self.assertEqual(result.returncode,0,result.stderr); self.assertEqual(marker.read_text(),"ok")
+        (node/"summon.lock").write_text(json.dumps(lock)); result=run(MESH,"summon",node,"--execute"); self.assertEqual(result.returncode,0,result.stderr); self.assertEqual(marker.read_text(),"ok")
     def test_crawler_refuses_placeholder_namespaces_without_network(self):
         catalog=self.tmp/"catalog.jsonl"; wal=self.tmp/"crawler-wal.jsonl"
         result=run(ENGINE/"crawl_namespaces.py","--config",ENGINE/"namespaces.toml","--output",catalog,"--wal",wal)
@@ -64,9 +66,9 @@ class EngineE2E(unittest.TestCase):
         self.assertEqual(len([p for p in proposals if p["namespace"]=="ns-b"]),0)
     def test_diode_redaction_allowlist_and_merkle(self):
         source=self.tmp/"private.jsonl"; out=self.tmp/"public.jsonl"; root=self.tmp/"root.txt"
-        rows=[{"namespace":"ns","repository":"public/repo","private":False,"description":"public","secret":"must-not-leak"},{"namespace":"ns","repository":"private/repo","private":True,"description":"private"},{"namespace":"ns","repository":"private-by-visibility/repo","visibility":"private","description":"also private"}]
+        rows=[{"namespace":"ns","repository":"public/repo","visibility":"public","private":False,"description":"public","secret":"must-not-leak"},{"namespace":"ns","repository":"private/repo","private":True,"description":"private"},{"namespace":"ns","repository":"private-by-visibility/repo","visibility":"private","description":"also private"}]
         source.write_text("".join(canonical(r)+"\n" for r in rows))
-        result=run(ENGINE/"diode_promote.py","--input",source,"--output",out,"--root-output",root); self.assertEqual(result.returncode,0,result.stderr)
+        result=run(ENGINE/"diode_promote.py","--input",source,"--output",out,"--root-output",root,"--approve-review"); self.assertEqual(result.returncode,0,result.stderr)
         emitted=out.read_text(); self.assertIn("public/repo",emitted); self.assertNotIn("private/repo",emitted); self.assertNotIn("must-not-leak",emitted)
         public=[json.loads(x) for x in emitted.splitlines()]; expected=root_for([canonical(x).encode() for x in public]); self.assertIn("root="+expected,root.read_text()); self.assertIn("redacted=2",root.read_text())
 if __name__=="__main__": unittest.main(verbosity=2)
