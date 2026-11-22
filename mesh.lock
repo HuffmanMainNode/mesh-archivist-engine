@@ -4,8 +4,8 @@
     {
       "node_id": "repo-mesh-blueprint",
       "uri": "https://github.com/HuffmanMainNode/repo-mesh-blueprint",
-      "version": "v1.0.0",
-      "commit": "0b163af9747c26a813a2ab8523de2529c830f91f",
+      "version": "v1.0.1",
+      "commit": "f86fc31ee2b89b7fabf73a18130b93a243f401e8",
       "depends_on": []
     }
   ]
